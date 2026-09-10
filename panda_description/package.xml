@@ -3,11 +3,12 @@
 <package format="3">
   <name>panda_description</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>Panda description folder</description>
   <maintainer email="z5506409@ad.unsw.edu.au">kye</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>urdf_tutorial</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
