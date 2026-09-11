@@ -6,6 +6,16 @@ This repository adds rviz folder and launch file to visualise the panda arm.
 
 ## Learning Notes
 
+### Change urdf and urdf.xacro paths
+the default one is built from *moveit resources*, we have to replace that path to our own
+```bash
+cd ~/ros2_ws/src/Moveit2_Franka/panda_description
+
+sed -i 's/moveit_resources_panda_description/panda_description/g' \
+  urdf/panda.urdf urdf/panda.urdf.xacro
+rg "moveit_resources|package://" urdf
+```
+
 ### CMakeLists
 ----
 In `CMakeLists.txt`, add `find_package(urdf_tutorial REQUIRED)`
