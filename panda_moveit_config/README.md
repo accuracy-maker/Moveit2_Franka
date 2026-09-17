@@ -265,4 +265,6 @@ ros2 launch panda_moveit_config demo.launch.py
 ![movit_demo](md_img/movit_demo.png)
 
 
+## Planning with Obstacles
+A natural setup forward is adding obstacles into the scene and making a planning that is obstacle avoidance.
 
