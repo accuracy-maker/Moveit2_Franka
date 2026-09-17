@@ -2,6 +2,12 @@
 
 Most of files are copied from [moveit resources](https://github.com/moveit/moveit_resources)
 
+## Install ROS2 Controller
+```bash
+sudo apt update
+sudo apt install ros-jazzy-ros2-control ros-jazzy-ros2-controllers
+```
+
 ## CMakeLists
 add packages
 ```txt
@@ -245,9 +251,18 @@ right now, the folder structure is like
 As we maintain it maunally, we don't include `.setup_assitant` here
 
 ## Launch file
-
-
-
+Launch file mainly writes a combination of ROS2 nodes, arguments and parameters for simplicity. 
+Folder structure is like this:
+```txt
+.
+├── demo.launch.py
+└── moveit.rviz
+```
+run the command:
+```bash
+ros2 launch panda_moveit_config demo.launch.py
+```
+![movit_demo](md_img/moveit_demo.png)
 
 
 

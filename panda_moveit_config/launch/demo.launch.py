@@ -1,94 +1,89 @@
 import os
-
-
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
-from launch.coditions import IfCondition
+from launch.conditions import IfCondition
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 from ament_index_python.packages import get_package_share_directory
 from moveit_configs_utils import MoveItConfigsBuilder
 
+
 def distro_specific_path(package_share: str, base_relpath: str) -> str:
-    """return a distro-overridable share-relative path"""
+    """Return a distro-overridable share-relative path.
 
-    # read the current ROS distribution
-    # ROS_DISTRO=jazzy
+    ``<package_share>/<base_relpath>`` is the default form. A file at
+    ``<package_share>/<stem>.<ROS_DISTRO><ext>`` overrides it when the
+    ``ROS_DISTRO`` env var is set and the override file exists.
+
+    See .github/DISTRO_COMPAT_POLICY.md §1.3 for the broader policy.
+    Long-term this helper should live in ``moveit_configs_utils`` so
+    every launch using ``MoveItConfigsBuilder`` gets the behavior for
+    free.
+    """
     distro = os.environ.get("ROS_DISTRO", "")
-
-    # if ROS_DISTRO is set
     if distro:
-        # config/joint_limits.yaml
-        # stem = config/joint_limits
-        # ext = .yaml
         stem, ext = os.path.splitext(base_relpath)
-
-        # override: <package_share>/config/joint_limits.jazzy.yaml
         override = os.path.join(package_share, f"{stem}.{distro}{ext}")
-
         if os.path.isfile(override):
             return override
     return os.path.join(package_share, base_relpath)
 
+
 def generate_launch_description():
 
-    # command line arguments
+    # Command-line arguments
     rviz_config_arg = DeclareLaunchArgument(
         "rviz_config",
-        default_value = "moveit.rviz",
+        default_value="moveit.rviz",
         description="RViz configuration file",
     )
 
     db_arg = DeclareLaunchArgument(
-        "db",
-        default_value = "False",
-        description = "Database flag",
+        "db", default_value="False", description="Database flag"
     )
 
-    # mock_components: This means the robot uses simulated/mock hardware.
-    # It is useful for testing controllers and MoveIt without connecting to a real robot.
-    # isaac: This means the robot uses an Isaac Sim hardware interface, allowing ROS 2 control to communicate with a robot simulated in NVIDIA Isaac Sim.
+
     ros2_control_hardware_type = DeclareLaunchArgument(
         "ros2_control_hardware_type",
-        default_value = "mock_components",
-        description = "ROS 2 control hardware interface type to use for the launch file -- possible values: [mock_components, isaac]"
+        default_value="mock_components",
+        description="ROS 2 control hardware interface type to use for the launch file -- possible values: [mock_components, isaac]",
     )
 
     moveit_config = (
-        MoveItConfigsBuilder("panda_moveit_config")
+        MoveItConfigsBuilder("panda")
         .robot_description(
-            file_path = "config/panda.urdf.xacro",
-            mappings = {
+            file_path="config/panda.urdf.xacro",
+            mappings={
                 "ros2_control_hardware_type": LaunchConfiguration(
                     "ros2_control_hardware_type"
                 )
             },
         )
-        .robot_description_semantic(file_path = "config/panda.srdf")
+        .robot_description_semantic(file_path="config/panda.srdf")
         .planning_scene_monitor(
             publish_robot_description=True, publish_robot_description_semantic=True
         )
-        .trajectory_execution(file_path = "config/gripper_moveit_controllers.yaml")
+        .trajectory_execution(file_path="config/gripper_moveit_controllers.yaml")
         .planning_pipelines(
-            pipelines=["ompl", "chomp", "pilz_industrial_motion_planner", "stomp"]
+            pipelines=["ompl", "pilz_industrial_motion_planner"]
         )
         .to_moveit_configs()
     )
 
-    # start the actual move_group node/action server
+    # Start the actual move_group node/action server
     move_group_node = Node(
         package="moveit_ros_move_group",
         executable="move_group",
         output="screen",
         parameters=[moveit_config.to_dict()],
-        arguments=["--ros-args", "--log-level", "info"], 
+        arguments=["--ros-args", "--log-level", "info"],
     )
 
     # RViz
     rviz_base = LaunchConfiguration("rviz_config")
     rviz_config = PathJoinSubstitution(
-        [FindPackageShare("moveit_resources_panda_moveit_config"), "launch", rviz_base]
+        [FindPackageShare("panda_moveit_config"), "launch", rviz_base]
     )
     rviz_node = Node(
         package="rviz2",
@@ -111,7 +106,7 @@ def generate_launch_description():
         executable="static_transform_publisher",
         name="static_transform_publisher",
         output="log",
-        arguments=["0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "world", "panda_link0"],
+        arguments=["--frame-id", "world", "--child-frame-id", "panda_link0"],
     )
 
     # Publish TF
@@ -123,27 +118,30 @@ def generate_launch_description():
         parameters=[moveit_config.robot_description],
     )
 
-    # distro-dependent controller
-   ros2_controllers_path = distro_specific_path(
+    # ros2_control using FakeSystem as hardware.
+    # The controller-class names in ros2_controllers.yaml differ between distros
+    # (Jazzy+ uses parallel_gripper_action_controller, Humble uses
+    # position_controllers). distro_specific_path() picks the Humble override
+    # config/ros2_controllers.humble.yaml when ROS_DISTRO=humble; falls back to
+    # the default file otherwise. See .github/DISTRO_COMPAT_POLICY.md §1.3.
+    ros2_controllers_path = distro_specific_path(
         get_package_share_directory("panda_moveit_config"),
         "config/ros2_controllers.yaml",
-   )
-   
-   # create ROS2 nodes
-   ros2_control_node = Node(
-        package = "controller_manager",
-        executable = "ros2_control_node",
-        parameters = [ros2_controllers_path],
-        remappings = [
+    )
+    ros2_control_node = Node(
+        package="controller_manager",
+        executable="ros2_control_node",
+        parameters=[ros2_controllers_path],
+        remappings=[
             ("/controller_manager/robot_description", "/robot_description"),
         ],
-        output = "screen",
+        output="screen",
     )
 
-   joint_state_broadcaster_spawner = Node(
-        package = "controller_manager",
-        executable = "spawner",
-        arguments = [
+    joint_state_broadcaster_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=[
             "joint_state_broadcaster",
             "--controller-manager",
             "/controller_manager",
@@ -151,11 +149,11 @@ def generate_launch_description():
             ros2_controllers_path,
         ],
     )
-    
+
     panda_arm_controller_spawner = Node(
-        package = "controller_manager",
-        executable = "spawner",
-        arguments = [
+        package="controller_manager",
+        executable="spawner",
+        arguments=[
             "panda_arm_controller",
             "-c",
             "/controller_manager",
@@ -165,29 +163,29 @@ def generate_launch_description():
     )
 
     panda_hand_controller_spawner = Node(
-        package = "controller_manager",
-        executable = "spawner",
-        arguments = [
+        package="controller_manager",
+        executable="spawner",
+        arguments=[
             "panda_hand_controller",
             "-c",
-            "/ros2_controller_manager",
+            "/controller_manager",
             "--param-file",
             ros2_controllers_path,
-        ]
+        ],
     )
 
-    # warehouse mongodb server
+    # Warehouse mongodb server
     db_config = LaunchConfiguration("db")
     mongodb_server_node = Node(
-        package = "warehouse_ros_mongo",
-        executable = "mongo_wrapper_ros.py",
-        parameters = [
-            {"warehouse_port" : 33829},
+        package="warehouse_ros_mongo",
+        executable="mongo_wrapper_ros.py",
+        parameters=[
+            {"warehouse_port": 33829},
             {"warehouse_host": "localhost"},
             {"warehouse_plugin": "warehouse_ros_mongo::MongoDatabaseConnection"},
         ],
-        output = "screen",
-        condition = IfCondition(db_config),
+        output="screen",
+        condition=IfCondition(db_config),
     )
 
     return LaunchDescription(
@@ -206,10 +204,3 @@ def generate_launch_description():
             mongodb_server_node,
         ]
     )
-
-
-
-
-
-
-
