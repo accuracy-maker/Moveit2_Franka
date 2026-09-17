@@ -262,7 +262,7 @@ run the command:
 ```bash
 ros2 launch panda_moveit_config demo.launch.py
 ```
-![movit_demo](md_img/moveit_demo.png)
+![movit_demo](md_img/movit_demo.png)
 
 
 
