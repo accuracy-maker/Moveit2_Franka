@@ -20,7 +20,7 @@ find_package(rviz_visual_tools REQUIRED)
 
 # install
 install (
-  DIRECTORY config launch rviz
+  DIRECTORY config launch 
   DESTINATION share/${PROJECT_NAME}
 )
 ```

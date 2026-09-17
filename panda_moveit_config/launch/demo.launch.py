@@ -77,7 +77,7 @@ def generate_launch_description():
     )
 
     # start the actual move_group node/action server
-    move_group_mode = Node(
+    move_group_node = Node(
         package="moveit_ros_move_group",
         executable="move_group",
         output="screen",
@@ -124,4 +124,92 @@ def generate_launch_description():
     )
 
     # distro-dependent controller
+   ros2_controllers_path = distro_specific_path(
+        get_package_share_directory("panda_moveit_config"),
+        "config/ros2_controllers.yaml",
+   )
+   
+   # create ROS2 nodes
+   ros2_control_node = Node(
+        package = "controller_manager",
+        executable = "ros2_control_node",
+        parameters = [ros2_controllers_path],
+        remappings = [
+            ("/controller_manager/robot_description", "/robot_description"),
+        ],
+        output = "screen",
+    )
+
+   joint_state_broadcaster_spawner = Node(
+        package = "controller_manager",
+        executable = "spawner",
+        arguments = [
+            "joint_state_broadcaster",
+            "--controller-manager",
+            "/controller_manager",
+            "--param-file",
+            ros2_controllers_path,
+        ],
+    )
     
+    panda_arm_controller_spawner = Node(
+        package = "controller_manager",
+        executable = "spawner",
+        arguments = [
+            "panda_arm_controller",
+            "-c",
+            "/controller_manager",
+            "--param-file",
+            ros2_controllers_path,
+        ],
+    )
+
+    panda_hand_controller_spawner = Node(
+        package = "controller_manager",
+        executable = "spawner",
+        arguments = [
+            "panda_hand_controller",
+            "-c",
+            "/ros2_controller_manager",
+            "--param-file",
+            ros2_controllers_path,
+        ]
+    )
+
+    # warehouse mongodb server
+    db_config = LaunchConfiguration("db")
+    mongodb_server_node = Node(
+        package = "warehouse_ros_mongo",
+        executable = "mongo_wrapper_ros.py",
+        parameters = [
+            {"warehouse_port" : 33829},
+            {"warehouse_host": "localhost"},
+            {"warehouse_plugin": "warehouse_ros_mongo::MongoDatabaseConnection"},
+        ],
+        output = "screen",
+        condition = IfCondition(db_config),
+    )
+
+    return LaunchDescription(
+        [
+            rviz_config_arg,
+            db_arg,
+            ros2_control_hardware_type,
+            rviz_node,
+            static_tf_node,
+            robot_state_publisher,
+            move_group_node,
+            ros2_control_node,
+            joint_state_broadcaster_spawner,
+            panda_arm_controller_spawner,
+            panda_hand_controller_spawner,
+            mongodb_server_node,
+        ]
+    )
+
+
+
+
+
+
+
