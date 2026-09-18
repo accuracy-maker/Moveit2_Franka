@@ -25,6 +25,15 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
+add_executable(hello_moveit
+  src/hello_moveit.cpp
+)
+
+ament_target_dependencies(hello_moveit
+  rclcpp
+  moveit_ros_planning_interface
+)
+
 add_executable(plan_around_box
   src/plan_around_box.cpp
 )
@@ -38,7 +47,9 @@ ament_target_dependencies(plan_around_box
 )
 
 install(
-  TARGETS plan_around_box
+  TARGETS
+    hello_moveit
+    plan_around_box
   DESTINATION lib/${PROJECT_NAME}
 )
 

@@ -10,7 +10,16 @@ int main(int argc, char* argv[])
 {
   rclcpp::init(argc, argv);
 
-  auto node = rclcpp::Node::make_shared("plan_around_box");
+  auto const node = std::make_shared<rclcpp::Node>(
+    "play_around_box",
+    rclcpp::NodeOptions()
+      .automatically_declare_parameters_from_overrides(true)
+  );
+
+  // create a ROS logger
+  auto const logger = rclcpp::get_logger("play_around_box");
+
+  // planning
 
   moveit::planning_interface::MoveGroupInterface move_group(
       node, "panda_arm");
